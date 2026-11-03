@@ -1,13 +1,12 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { format, isToday, isYesterday } from "date-fns";
 import {
   ArrowRight,
   Ban,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Download,
@@ -25,6 +24,7 @@ import {
 } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import api from "@/lib/axios";
 import { downloadFile } from "@/lib/download";
@@ -235,7 +235,7 @@ function sortedFields(changes: Record<string, Change>) {
 function dayLabel(d: Date) {
   if (isToday(d)) return "Today";
   if (isYesterday(d)) return "Yesterday";
-  return format(d, "EEEE, d MMM yyyy");
+  return format(d, "d MMM yyyy");
 }
 
 export default function SystemLogsPage() {
@@ -257,7 +257,7 @@ export default function SystemLogsPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [actors, setActors] = useState<Actor[]>([]);
-  const [open, setOpen] = useState<string | null>(null);
+  const [selected, setSelected] = useState<LogEntry | null>(null);
 
   const setParam = useCallback(
     (patch: Record<string, string>) => {
@@ -320,17 +320,6 @@ export default function SystemLogsPage() {
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const filtered = !!(category || action || actorId || leadId || from || to || search);
 
-  // group by IST day (the browser shows local time; the team is in India)
-  const groups = useMemo(() => {
-    const out: { day: string; rows: LogEntry[] }[] = [];
-    for (const e of items) {
-      const day = dayLabel(new Date(e.createdAt));
-      const last = out[out.length - 1];
-      if (last?.day === day) last.rows.push(e);
-      else out.push({ day, rows: [e] });
-    }
-    return out;
-  }, [items]);
 
   return (
     <div className="space-y-5">
@@ -438,7 +427,7 @@ export default function SystemLogsPage() {
       </div>
 
       {/* list */}
-      <section className="rounded-2xl border border-border bg-card">
+      <section className="overflow-hidden rounded-2xl border border-border bg-card">
         <header className="flex items-center justify-between border-b border-border px-5 py-3 text-sm">
           <span className="text-muted-foreground">
             {loading && !items.length ? "Loading…" : `${total.toLocaleString("en-IN")} ${total === 1 ? "entry" : "entries"}`}
@@ -446,17 +435,7 @@ export default function SystemLogsPage() {
           {totalPages > 1 && <Pager page={page} totalPages={totalPages} onPage={(p) => setParam({ page: String(p) })} />}
         </header>
 
-        {loading && !items.length ? (
-          <div className="divide-y divide-border" aria-busy="true">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="flex items-center gap-4 px-5 py-4">
-                <span className="h-3 w-12 animate-pulse rounded bg-muted" />
-                <span className="size-8 animate-pulse rounded-lg bg-muted" />
-                <span className="h-3.5 flex-1 animate-pulse rounded bg-muted" />
-              </div>
-            ))}
-          </div>
-        ) : items.length === 0 ? (
+        {!loading && items.length === 0 ? (
           <div className="flex flex-col items-center gap-2 px-6 py-16 text-center">
             <ScrollText className="size-8 text-muted-foreground/60" />
             <p className="font-medium">{filtered ? "Nothing matches these filters" : "Nothing logged yet"}</p>
@@ -465,25 +444,32 @@ export default function SystemLogsPage() {
             </p>
           </div>
         ) : (
-          <div className={cn(loading && "opacity-60 transition-opacity")}>
-            {groups.map((g) => (
-              <Fragment key={g.day}>
-                <div className="sticky top-0 z-[1] border-b border-border bg-muted/60 px-5 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground backdrop-blur">
-                  {g.day}
-                </div>
-                <ul className="divide-y divide-border">
-                  {g.rows.map((e) => (
-                    <LogRow
-                      key={e.id}
-                      entry={e}
-                      open={open === e.id}
-                      onToggle={() => setOpen((o) => (o === e.id ? null : e.id))}
-                      onLeadHistory={(id, label) => setParam({ leadId: id, label })}
-                    />
-                  ))}
-                </ul>
-              </Fragment>
-            ))}
+          <div className={cn("overflow-x-auto", loading && items.length > 0 && "opacity-60 transition-opacity")}>
+            <table className="w-full min-w-[920px] text-sm">
+              <thead className="bg-muted/50 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                <tr className="divide-x divide-border">
+                  <th className="w-[150px] px-5 py-2.5 font-medium">When</th>
+                  <th className="w-[200px] px-3 py-2.5 font-medium">User</th>
+                  <th className="w-[160px] px-3 py-2.5 font-medium">Action</th>
+                  <th className="w-[220px] px-3 py-2.5 font-medium">Record</th>
+                  <th className="px-3 py-2.5 font-medium">Details</th>
+                  <th className="w-[130px] px-5 py-2.5 font-medium">IP address</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {loading && !items.length
+                  ? Array.from({ length: 8 }).map((_, i) => (
+                      <tr key={i} aria-hidden className="divide-x divide-border">
+                        {[90, 130, 100, 140, 220, 80].map((w, j) => (
+                          <td key={j} className={cn("py-3.5", j === 0 || j === 5 ? "px-5" : "px-3")}>
+                            <span className="block h-3.5 animate-pulse rounded bg-muted" style={{ width: w }} />
+                          </td>
+                        ))}
+                      </tr>
+                    ))
+                  : items.map((e) => <LogRow key={e.id} entry={e} active={selected?.id === e.id} onOpen={() => setSelected(e)} />)}
+              </tbody>
+            </table>
           </div>
         )}
 
@@ -493,6 +479,15 @@ export default function SystemLogsPage() {
           </footer>
         )}
       </section>
+
+      <LogSheet
+        entry={selected}
+        onClose={() => setSelected(null)}
+        onLeadHistory={(id, label) => {
+          setSelected(null);
+          setParam({ leadId: id, label });
+        }}
+      />
     </div>
   );
 }
@@ -552,86 +547,171 @@ function Pager({ page, totalPages, onPage }: { page: number; totalPages: number;
   );
 }
 
-function LogRow({
+/** "Status: Quote sent → Customer accepted" for the first fields of an update */
+function changeSummary(e: LogEntry, max = 2) {
+  const changes = e.changes ?? {};
+  const fields = sortedFields(changes);
+  const parts = fields.slice(0, max).map((f) => {
+    const c = changes[f];
+    if (isStructured(c.from) || isStructured(c.to)) return `${humanize(f)} changed`;
+    return `${humanize(f)}: ${formatValue(f, c.from, c.fromLabel, e.entityType)} → ${formatValue(f, c.to, c.toLabel, e.entityType)}`;
+  });
+  return { parts, more: Math.max(0, fields.length - max), count: fields.length };
+}
+
+function details(e: LogEntry) {
+  const reason = typeof e.meta?.reason === "string" ? e.meta.reason : null;
+  if (e.category === "AUTH") return reason ?? "—";
+  if (e.action === "UPDATE") {
+    const { parts, more } = changeSummary(e);
+    return [...parts, more ? `+${more} more` : null].filter(Boolean).join(" · ");
+  }
+  const n = Object.keys(e.changes ?? {}).length;
+  return e.action === "CREATE" ? `${n} field${n === 1 ? "" : "s"} filled in` : e.action === "DELETE" ? "Record removed" : "—";
+}
+
+function Initials({ name }: { name: string }) {
+  const ini = name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase())
+    .join("");
+  return (
+    <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-[#3B82F6]/10 text-[11px] font-semibold text-[#2563EB] dark:text-[#60A5FA]">
+      {ini || "?"}
+    </span>
+  );
+}
+
+function ActionBadge({ action }: { action: string }) {
+  const a = actionMeta(action);
+  const Icon = a.icon;
+  return (
+    <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium", a.tone)}>
+      <Icon className="size-3.5" />
+      {a.label}
+    </span>
+  );
+}
+
+function LogRow({ entry: e, active, onOpen }: { entry: LogEntry; active: boolean; onOpen: () => void }) {
+  const when = new Date(e.createdAt);
+  const role = e.actorRole && !["SYSTEM", "API"].includes(e.actorRole) ? formatRoleLabel(e.actorRole as UserRole) : e.actorRole === "API" ? "Integration" : null;
+  return (
+    <tr
+      tabIndex={0}
+      onClick={onOpen}
+      onKeyDown={(ev) => {
+        if (ev.key === "Enter" || ev.key === " ") {
+          ev.preventDefault();
+          onOpen();
+        }
+      }}
+      className={cn(
+        "cursor-pointer divide-x divide-border align-middle transition-colors hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:outline-none",
+        active && "bg-[#3B82F6]/5"
+      )}
+    >
+      <td className="whitespace-nowrap px-5 py-3">
+        <div className="font-medium tabular-nums">{format(when, "h:mm a")}</div>
+        <div className="text-xs text-muted-foreground">{dayLabel(when)}</div>
+      </td>
+      <td className="px-3 py-3">
+        <div className="flex items-center gap-2.5">
+          <Initials name={e.actorName ?? "System"} />
+          <div className="min-w-0">
+            <div className="truncate font-medium">{e.actorName ?? "System"}</div>
+            {role && <div className="truncate text-xs text-muted-foreground">{role}</div>}
+          </div>
+        </div>
+      </td>
+      <td className="px-3 py-3">
+        <ActionBadge action={e.action} />
+      </td>
+      <td className="px-3 py-3">
+        {e.category === "AUTH" ? (
+          <span className="text-muted-foreground">Sign-in</span>
+        ) : (
+          <div className="min-w-0">
+            <div className="truncate font-medium">{e.entityLabel ?? "—"}</div>
+            <div className="truncate text-xs capitalize text-muted-foreground">{RECORD[e.entityType ?? ""] ?? e.entityType}</div>
+          </div>
+        )}
+      </td>
+      <td className="max-w-0 px-3 py-3">
+        <div className="truncate text-muted-foreground">{details(e)}</div>
+      </td>
+      <td className="whitespace-nowrap px-5 py-3 font-mono text-xs text-muted-foreground">{e.ip ?? "—"}</td>
+    </tr>
+  );
+}
+
+function LogSheet({
   entry: e,
-  open,
-  onToggle,
+  onClose,
   onLeadHistory,
 }: {
-  entry: LogEntry;
-  open: boolean;
-  onToggle: () => void;
+  entry: LogEntry | null;
+  onClose: () => void;
   onLeadHistory: (leadId: string, label: string) => void;
 }) {
+  // keep showing the last entry while the panel slides out
+  const [shown, setShown] = useState<LogEntry | null>(e);
+  if (e && e !== shown) setShown(e); // update during render (React's "derived state" pattern)
+  const x = e ?? shown;
+
+  return (
+    <Sheet open={!!e} onOpenChange={(o) => !o && onClose()}>
+      <SheetContent side="right" className="w-full gap-0 p-0 data-[side=right]:sm:max-w-xl">
+        {x && <SheetBody e={x} onLeadHistory={onLeadHistory} />}
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+function SheetBody({ e, onLeadHistory }: { e: LogEntry; onLeadHistory: (leadId: string, label: string) => void }) {
   const a = actionMeta(e.action);
   const Icon = a.icon;
   const isAuth = e.category === "AUTH";
   const changes = e.changes ?? {};
   const fields = sortedFields(changes);
   const href = recordHref(e);
-  const reason = typeof e.meta?.reason === "string" ? e.meta.reason : null;
-
-  // "status: Quote sent → Customer accepted" for the first two fields of an update
-  const summary =
-    e.action === "UPDATE"
-      ? fields.slice(0, 2).map((f) => {
-          const c = changes[f];
-          if (isStructured(c.from) || isStructured(c.to)) return `${humanize(f)} changed`;
-          return `${humanize(f)}: ${formatValue(f, c.from, c.fromLabel, e.entityType)} → ${formatValue(f, c.to, c.toLabel, e.entityType)}`;
-        })
-      : [];
+  const record = RECORD[e.entityType ?? ""] ?? e.entityType ?? "record";
+  const role = e.actorRole && !["SYSTEM", "API"].includes(e.actorRole) ? formatRoleLabel(e.actorRole as UserRole) : null;
 
   return (
-    <li>
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-expanded={open}
-        className="flex w-full items-start gap-3 px-5 py-3 text-left transition-colors hover:bg-muted/40"
-      >
-        <span className="w-14 shrink-0 pt-1.5 text-xs tabular-nums text-muted-foreground">
-          {format(new Date(e.createdAt), "h:mm a")}
-        </span>
-        <span className={cn("mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg", a.tone)}>
-          <Icon className="size-4" />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block text-sm leading-6">
-            <span className="font-medium">{e.actorName ?? "System"}</span>
-            {e.actorRole && !["SYSTEM", "API"].includes(e.actorRole) && (
-              <span className="ml-1.5 rounded bg-muted px-1.5 py-px text-[11px] font-medium text-muted-foreground">
-                {formatRoleLabel(e.actorRole as UserRole)}
-              </span>
-            )}{" "}
-            <span className="text-muted-foreground">{a.verb}</span>
-            {!isAuth && (
-              <>
-                {" "}
-                <span className="text-muted-foreground">{RECORD[e.entityType ?? ""] ?? e.entityType}</span>{" "}
-                {e.entityLabel && <span className="font-medium">{e.entityLabel}</span>}
-              </>
-            )}
+    <>
+      <SheetHeader className="border-b border-border p-5 pr-12">
+        <div className="flex items-start gap-3">
+          <span className={cn("flex size-10 shrink-0 items-center justify-center rounded-xl", a.tone)}>
+            <Icon className="size-5" />
           </span>
-          {(summary.length > 0 || reason || (isAuth && e.ip)) && (
-            <span className="mt-0.5 block truncate text-xs text-muted-foreground">
-              {[...summary, fields.length > 2 ? `+${fields.length - 2} more` : null, reason, isAuth ? `IP ${e.ip}` : null]
-                .filter(Boolean)
-                .join(" · ")}
-            </span>
-          )}
-        </span>
-        <ChevronDown className={cn("mt-2 size-4 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")} />
-      </button>
+          <div className="min-w-0">
+            <SheetTitle className="text-base leading-snug">
+              {isAuth ? a.label : `${a.label} ${record}`}
+              {!isAuth && e.entityLabel && <span className="font-semibold"> · {e.entityLabel}</span>}
+            </SheetTitle>
+            <SheetDescription className="mt-0.5">
+              {e.actorName ?? "System"}
+              {role && ` (${role})`} · {format(new Date(e.createdAt), "d MMM yyyy, h:mm:ss a")}
+            </SheetDescription>
+          </div>
+        </div>
+      </SheetHeader>
 
-      {open && (
-        <div className="space-y-3 border-t border-dashed border-border bg-muted/20 px-5 py-4 sm:pl-[7.5rem]">
-          {fields.length > 0 && (
-            <div className="overflow-x-auto rounded-xl border border-border bg-card">
+      <div className="flex-1 space-y-6 overflow-y-auto p-5">
+        {fields.length > 0 && (
+          <section>
+            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              {e.action === "CREATE" ? "Values" : e.action === "DELETE" ? "What it held" : `What changed (${fields.length})`}
+            </h3>
+            <div className="overflow-hidden rounded-xl border border-border">
               <table className="w-full text-sm">
                 <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
                   <tr>
-                    <th className="px-3 py-2 font-medium">Field</th>
-                    {e.action !== "CREATE" && <th className="px-3 py-2 font-medium">Before</th>}
+                    <th className="w-[34%] px-3 py-2 font-medium">Field</th>
+                    {e.action !== "CREATE" && <th className="px-3 py-2 font-medium">{e.action === "DELETE" ? "Value" : "Before"}</th>}
                     {e.action !== "DELETE" && <th className="px-3 py-2 font-medium">{e.action === "CREATE" ? "Value" : "After"}</th>}
                   </tr>
                 </thead>
@@ -640,9 +720,9 @@ function LogRow({
                     const c = changes[f];
                     return (
                       <tr key={f} className="align-top">
-                        <td className="whitespace-nowrap px-3 py-2 font-medium">{humanize(f)}</td>
+                        <td className="px-3 py-2 font-medium">{humanize(f)}</td>
                         {e.action !== "CREATE" && (
-                          <td className="px-3 py-2 text-muted-foreground">
+                          <td className={cn("px-3 py-2", e.action === "UPDATE" && "text-muted-foreground line-through decoration-muted-foreground/40")}>
                             <Value field={f} v={c.from} label={c.fromLabel} entityType={e.entityType} />
                           </td>
                         )}
@@ -657,52 +737,61 @@ function LogRow({
                 </tbody>
               </table>
             </div>
-          )}
+          </section>
+        )}
 
-          <dl className="grid gap-x-6 gap-y-1.5 text-xs sm:grid-cols-2">
-            <Meta label="When">{format(new Date(e.createdAt), "d MMM yyyy, h:mm:ss a")}</Meta>
+        <section>
+          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Details</h3>
+          <dl className="divide-y divide-border rounded-xl border border-border text-sm">
+            <Meta label="When">{format(new Date(e.createdAt), "EEEE, d MMM yyyy, h:mm:ss a")}</Meta>
+            <Meta label="User">
+              {e.actorName ?? "System"}
+              {role && <span className="text-muted-foreground"> · {role}</span>}
+            </Meta>
             {e.actorEmail && <Meta label="Account">{e.actorEmail}</Meta>}
-            {e.ip && <Meta label="IP address">{e.ip}</Meta>}
-            {e.userAgent && (
-              <Meta label="Browser">
-                <span className="break-all">{e.userAgent}</span>
-              </Meta>
-            )}
             {e.meta &&
               Object.entries(e.meta).map(([k, v]) => (
                 <Meta key={k} label={humanize(k)}>
                   {String(v)}
                 </Meta>
               ))}
+            <Meta label="IP address">
+              <span className="font-mono text-xs">{e.ip ?? "—"}</span>
+            </Meta>
+            {e.userAgent && (
+              <Meta label="Browser">
+                <span className="break-all text-xs text-muted-foreground">{e.userAgent}</span>
+              </Meta>
+            )}
             {e.entityId && !isAuth && (
               <Meta label="Record ID">
-                <span className="font-mono">{e.entityId}</span>
+                <span className="break-all font-mono text-xs">{e.entityId}</span>
               </Meta>
             )}
           </dl>
+        </section>
+      </div>
 
-          {(href || e.leadId) && (
-            <div className="flex flex-wrap gap-2">
-              {href && (
-                <Link href={href} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "gap-1.5")}>
-                  Open {RECORD[e.entityType ?? ""] ?? "record"} <ArrowRight className="size-3.5" />
-                </Link>
-              )}
-              {e.leadId && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="gap-1.5"
-                  onClick={() => onLeadHistory(e.leadId!, e.entityType === "Lead" ? (e.entityLabel ?? "") : "")}
-                >
-                  <ScrollText className="size-3.5" /> Full history of this lead
-                </Button>
-              )}
-            </div>
+      {(href || e.leadId) && (
+        <div className="flex flex-wrap gap-2 border-t border-border p-4">
+          {href && (
+            <Link href={href} className={cn(buttonVariants({ size: "sm" }), "gap-1.5")}>
+              Open {record} <ArrowRight className="size-3.5" />
+            </Link>
+          )}
+          {e.leadId && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={() => onLeadHistory(e.leadId!, e.entityType === "Lead" ? (e.entityLabel ?? "") : "")}
+            >
+              <ScrollText className="size-3.5" /> Full history of this lead
+            </Button>
           )}
         </div>
       )}
-    </li>
+    </>
   );
 }
 
@@ -722,9 +811,9 @@ function Value({ field, v, label, entityType }: { field: string; v: unknown; lab
 
 function Meta({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex gap-2">
-      <dt className="w-24 shrink-0 text-muted-foreground">{label}</dt>
-      <dd className="min-w-0">{children}</dd>
+    <div className="flex gap-3 px-3 py-2">
+      <dt className="w-28 shrink-0 text-muted-foreground">{label}</dt>
+      <dd className="min-w-0 flex-1">{children}</dd>
     </div>
   );
 }
