@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useUIStore } from "@/stores/ui-store";
@@ -16,7 +17,6 @@ import {
   Settings,
   ChevronLeft,
   Menu,
-  Zap,
   PhoneCall,
   LogOut,
   Truck,
@@ -161,9 +161,7 @@ function SidebarContent({
       >
         {!collapsed && (
           <Link href="/" className="flex min-w-0 flex-1 items-center gap-2.5">
-            <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[#3B82F6]">
-              <Zap className="size-4 text-white" />
-            </div>
+            <Image src="/logo.png" alt="" width={32} height={32} className="size-8 shrink-0" priority />
             <span className="truncate text-lg font-semibold text-white">
               MSP CRM
             </span>

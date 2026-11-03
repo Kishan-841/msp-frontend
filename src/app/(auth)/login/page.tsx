@@ -1,12 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
-  Zap,
   Loader2,
   Eye,
   EyeOff,
@@ -92,9 +92,7 @@ export default function LoginPage() {
         <div className="relative flex h-full flex-col p-10 xl:p-14">
           {/* Logo */}
           <div className="flex items-center gap-2.5">
-            <div className="flex size-9 items-center justify-center rounded-lg bg-[#3B82F6]">
-              <Zap className="size-5 text-white" />
-            </div>
+            <Image src="/logo.png" alt="" width={36} height={36} className="size-9" priority />
             <span className="text-lg font-semibold text-white">MSP CRM</span>
           </div>
 
@@ -143,9 +141,7 @@ export default function LoginPage() {
         <div className="relative w-full max-w-md rounded-2xl border border-border bg-card p-8 shadow-xl shadow-black/5 sm:p-10">
           {/* Mobile logo */}
           <div className="mb-8 flex items-center gap-2.5 lg:hidden">
-            <div className="flex size-10 items-center justify-center rounded-lg bg-[#3B82F6]">
-              <Zap className="size-5 text-white" />
-            </div>
+            <Image src="/logo.png" alt="" width={40} height={40} className="size-10" priority />
             <span className="text-xl font-semibold">MSP CRM</span>
           </div>
 
