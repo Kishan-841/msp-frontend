@@ -26,6 +26,7 @@ import {
   Repeat,
   Send,
   StickyNote,
+  ScrollText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -342,6 +343,17 @@ export default function LeadDetailPage() {
                 >
                   <Sparkles className="size-4" />
                   Open Workspace
+                </Button>
+              )}
+              {user?.role === "ADMIN" && (
+                <Button
+                  variant="ghost"
+                  onClick={() =>
+                    router.push(`/system-logs?leadId=${lead.id}&label=${encodeURIComponent(lead.companyName)}`)
+                  }
+                >
+                  <ScrollText className="size-4" />
+                  System log
                 </Button>
               )}
               {/* Repeat order: closed deal → same customer orders again */}

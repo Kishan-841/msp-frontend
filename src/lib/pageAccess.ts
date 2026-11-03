@@ -13,6 +13,7 @@ export const PAGE_ROLES: Record<string, UserRole[]> = {
   "/invoices": ["ADMIN", "ACCOUNTS", "MSP_TL", "SALES"], // Sales: their own deals' invoices
   "/vendors": ["ADMIN", "MSP_TL", "ACCOUNTS"],
   "/users": ["ADMIN"],
+  "/system-logs": ["ADMIN"], // sign-ins + every change
   "/team": ["ADMIN", "MSP_TL"], // per-person performance
 };
 

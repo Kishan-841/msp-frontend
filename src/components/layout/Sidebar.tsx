@@ -21,6 +21,7 @@ import {
   LogOut,
   Truck,
   Wallet,
+  ScrollText,
 } from "lucide-react";
 import type { UserRole } from "@/types";
 import { useTaskStore } from "@/stores/task-store";
@@ -69,6 +70,7 @@ const navItems: NavItemDef[] = [
   { href: "/accounts", label: "Accounts", icon: Wallet, roles: ["ACCOUNTS", "MSP_TL", "ADMIN"] },
   { href: "/vendors", label: "Vendors", icon: Building2, roles: ["ADMIN", "MSP_TL", "ACCOUNTS"] },
   { href: "/users", label: "Users", icon: UserCog, adminOnly: true },
+  { href: "/system-logs", label: "System log", icon: ScrollText, adminOnly: true },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
