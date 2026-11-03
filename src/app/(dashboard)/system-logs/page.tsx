@@ -9,6 +9,8 @@ import {
   Ban,
   ChevronLeft,
   ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
   Download,
   KeyRound,
   LogIn,
@@ -71,7 +73,8 @@ interface Actor {
   role: string | null;
 }
 
-const PAGE_SIZE = 30;
+const PAGE_SIZES = [20, 30, 50, 100];
+const DEFAULT_PAGE_SIZE = 30;
 
 const CATEGORIES: [string, string][] = [
   ["AUTH", "Sign-ins"],
@@ -251,6 +254,8 @@ export default function SystemLogsPage() {
   const to = params.get("to") ?? "";
   const search = params.get("search") ?? "";
   const page = Math.max(1, Number(params.get("page")) || 1);
+  const sizeParam = Number(params.get("size"));
+  const pageSize = PAGE_SIZES.includes(sizeParam) ? sizeParam : DEFAULT_PAGE_SIZE;
 
   const [searchText, setSearchText] = useState(search);
   const [items, setItems] = useState<LogEntry[]>([]);
@@ -294,7 +299,7 @@ export default function SystemLogsPage() {
 
   const load = useCallback(async () => {
     try {
-      const { data } = await api.get("/audit-logs", { params: { ...query, page, limit: PAGE_SIZE } });
+      const { data } = await api.get("/audit-logs", { params: { ...query, page, limit: pageSize } });
       setItems(data.data.items);
       setTotal(data.data.total);
     } catch (err) {
@@ -302,7 +307,7 @@ export default function SystemLogsPage() {
     } finally {
       setLoading(false);
     }
-  }, [query, page]);
+  }, [query, page, pageSize]);
 
   useEffect(() => {
     setLoading(true);
@@ -317,7 +322,7 @@ export default function SystemLogsPage() {
       .catch(() => undefined);
   }, []);
 
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const filtered = !!(category || action || actorId || leadId || from || to || search);
 
 
@@ -432,7 +437,11 @@ export default function SystemLogsPage() {
           <span className="text-muted-foreground">
             {loading && !items.length ? "Loading…" : `${total.toLocaleString("en-IN")} ${total === 1 ? "entry" : "entries"}`}
           </span>
-          {totalPages > 1 && <Pager page={page} totalPages={totalPages} onPage={(p) => setParam({ page: String(p) })} />}
+          {totalPages > 1 && (
+            <span className="tabular-nums text-muted-foreground">
+              Page {page} of {totalPages}
+            </span>
+          )}
         </header>
 
         {!loading && items.length === 0 ? (
@@ -473,10 +482,15 @@ export default function SystemLogsPage() {
           </div>
         )}
 
-        {totalPages > 1 && (
-          <footer className="flex justify-end border-t border-border px-5 py-3">
-            <Pager page={page} totalPages={totalPages} onPage={(p) => setParam({ page: String(p) })} />
-          </footer>
+        {total > 0 && (
+          <Pager
+            page={Math.min(page, totalPages)}
+            totalPages={totalPages}
+            total={total}
+            pageSize={pageSize}
+            onPage={(p) => setParam({ page: p > 1 ? String(p) : "" })}
+            onPageSize={(n) => setParam({ size: n === DEFAULT_PAGE_SIZE ? "" : String(n) })}
+          />
         )}
       </section>
 
@@ -524,26 +538,107 @@ function FilterSelect({
   );
 }
 
-function Pager({ page, totalPages, onPage }: { page: number; totalPages: number; onPage: (p: number) => void }) {
+/** 1 … 4 5 [6] 7 8 … 20 — first, last and two either side of the current page */
+function pageList(page: number, totalPages: number): (number | "gap")[] {
+  const keep = new Set([1, totalPages]);
+  for (let p = page - 2; p <= page + 2; p++) if (p >= 1 && p <= totalPages) keep.add(p);
+  const sorted = [...keep].sort((a, b) => a - b);
+  const out: (number | "gap")[] = [];
+  sorted.forEach((p, i) => {
+    if (i > 0 && p - sorted[i - 1] > 1) out.push(p - sorted[i - 1] === 2 ? p - 1 : "gap");
+    out.push(p);
+  });
+  return out;
+}
+
+function Pager({
+  page,
+  totalPages,
+  total,
+  pageSize,
+  onPage,
+  onPageSize,
+}: {
+  page: number;
+  totalPages: number;
+  total: number;
+  pageSize: number;
+  onPage: (p: number) => void;
+  onPageSize: (n: number) => void;
+}) {
+  const start = (page - 1) * pageSize + 1;
+  const end = Math.min(page * pageSize, total);
+  const sizes = useMemo(() => PAGE_SIZES.map((n) => ({ value: String(n), label: String(n) })), []);
+  const go = (p: number) => {
+    onPage(p);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   return (
-    <div className="flex items-center gap-1.5 text-sm">
-      <Button variant="outline" size="icon" className="size-8" disabled={page <= 1} onClick={() => onPage(page - 1)} aria-label="Newer">
-        <ChevronLeft className="size-4" />
-      </Button>
-      <span className="min-w-[88px] text-center tabular-nums text-muted-foreground">
-        Page {page} of {totalPages}
-      </span>
-      <Button
-        variant="outline"
-        size="icon"
-        className="size-8"
-        disabled={page >= totalPages}
-        onClick={() => onPage(page + 1)}
-        aria-label="Older"
-      >
-        <ChevronRight className="size-4" />
-      </Button>
-    </div>
+    <footer className="flex flex-col gap-3 border-t border-border px-5 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-muted-foreground">
+        <span className="tabular-nums">
+          Showing <span className="font-medium text-foreground">{start.toLocaleString("en-IN")}</span>–
+          <span className="font-medium text-foreground">{end.toLocaleString("en-IN")}</span> of{" "}
+          <span className="font-medium text-foreground">{total.toLocaleString("en-IN")}</span>
+        </span>
+        <span className="flex items-center gap-2">
+          Rows per page
+          <Select items={sizes} value={String(pageSize)} onValueChange={(v) => v && onPageSize(Number(v))}>
+            <SelectTrigger className="h-8 w-[72px]" aria-label="Rows per page">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {sizes.map((o) => (
+                <SelectItem key={o.value} value={o.value}>
+                  {o.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </span>
+      </div>
+
+      {totalPages > 1 && (
+        <nav className="flex items-center gap-1" aria-label="Pages">
+          <Button variant="outline" size="icon-sm" disabled={page <= 1} onClick={() => go(1)} aria-label="First page">
+            <ChevronsLeft className="size-4" />
+          </Button>
+          <Button variant="outline" size="icon-sm" disabled={page <= 1} onClick={() => go(page - 1)} aria-label="Previous page">
+            <ChevronLeft className="size-4" />
+          </Button>
+          <span className="hidden items-center gap-1 sm:flex">
+            {pageList(page, totalPages).map((p, i) =>
+              p === "gap" ? (
+                <span key={`gap${i}`} className="px-1 text-muted-foreground">
+                  …
+                </span>
+              ) : (
+                <Button
+                  key={p}
+                  variant={p === page ? "default" : "ghost"}
+                  size="icon-sm"
+                  className="min-w-8 px-2 tabular-nums"
+                  aria-current={p === page ? "page" : undefined}
+                  onClick={() => p !== page && go(p)}
+                >
+                  {p}
+                </Button>
+              )
+            )}
+          </span>
+          <span className="px-2 tabular-nums text-muted-foreground sm:hidden">
+            {page} / {totalPages}
+          </span>
+          <Button variant="outline" size="icon-sm" disabled={page >= totalPages} onClick={() => go(page + 1)} aria-label="Next page">
+            <ChevronRight className="size-4" />
+          </Button>
+          <Button variant="outline" size="icon-sm" disabled={page >= totalPages} onClick={() => go(totalPages)} aria-label="Last page">
+            <ChevronsRight className="size-4" />
+          </Button>
+        </nav>
+      )}
+    </footer>
   );
 }
 
