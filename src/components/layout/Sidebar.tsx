@@ -61,7 +61,7 @@ const navItems: NavItemDef[] = [
     href: "/my-leads",
     label: "Assigned Leads",
     icon: PhoneCall,
-    roles: ["SALES", "ADMIN"],
+    roles: ["SALES", "MSP_TL", "ADMIN"],
   },
   { href: "/meetings", label: "Meetings", icon: Calendar, roles: ["ADMIN", "MSP_TL", "SALES"] },
   { href: "/quotes", label: "Quotes", icon: FileText, roles: ["ADMIN", "MSP_TL", "SALES"] },

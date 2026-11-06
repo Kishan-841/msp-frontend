@@ -56,6 +56,7 @@ import {
 } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
 import { notify } from "@/lib/notify";
+import { canWorkLead } from "@/lib/leadAccess";
 import { useDataChanged } from "@/hooks/useDataChanged";
 import type { Lead, LeadStatus, LeadListResponse } from "@/types";
 import { LeadDialog } from "./_components/LeadDialog";
@@ -371,8 +372,7 @@ export default function LeadsPage() {
   // Assigned leads open in the workspace (where the work happens) for those who can work them;
   // everyone else (and unassigned leads) gets the detail page.
   const openLead = (lead: Lead) => {
-    const canWork =
-      isMspTl || (user?.role === "SALES" && lead.assignedTo?.id === user.id);
+    const canWork = isMspTl || canWorkLead(user, lead.assignedTo?.id);
     const working = !!lead.assignedTo && !["NEW", "CATEGORIZED"].includes(lead.status);
     router.push(canWork && working ? `/leads/${lead.id}/workspace` : `/leads/${lead.id}`);
   };

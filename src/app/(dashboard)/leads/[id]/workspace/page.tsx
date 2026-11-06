@@ -46,6 +46,7 @@ import { useAuthStore } from "@/stores/auth-store";
 import { NextStepBanner, leadNextStep } from "@/components/NextStepBanner";
 import { scopeToCurrentOrder } from "@/lib/orders";
 import { notify } from "@/lib/notify";
+import { canWorkLead } from "@/lib/leadAccess";
 import { NewOrderDialog } from "@/components/leads/NewOrderDialog";
 import { LoadError, loadFailureOf, type LoadFailure } from "@/components/leads/LoadError";
 import { useDataChanged } from "@/hooks/useDataChanged";
@@ -222,11 +223,10 @@ export default function LeadWorkspacePage() {
   }
 
   const stages = computeStageStatus(lead, latestQuote);
-  const canSell =
-    user?.role === "ADMIN" || (user?.role === "SALES" && lead.assignedTo?.id === user.id);
+  const canSell = canWorkLead(user, lead.assignedTo?.id);
   const salesLock = canSell
     ? undefined
-    : `Done by the Sales person on this lead${lead.assignedTo ? ` (${lead.assignedTo.name})` : ""}.`;
+    : `Done by the person this lead is assigned to${lead.assignedTo ? ` (${lead.assignedTo.name})` : ""}.`;
 
   const pipelineSteps: PipelineStep[] = [
     { label: "Call", status: stages.call, icon: Phone },

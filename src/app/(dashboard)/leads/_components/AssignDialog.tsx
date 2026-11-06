@@ -15,6 +15,8 @@ import api from "@/lib/axios";
 import { notify } from "@/lib/notify";
 import { cn, formatRoleLabel } from "@/lib/utils";
 import type { Lead, User } from "@/types";
+import { useAuthStore } from "@/stores/auth-store";
+import { ASSIGNABLE_ROLES } from "@/lib/leadAccess";
 
 interface AssignDialogProps {
   open: boolean;
@@ -38,6 +40,7 @@ export function AssignDialog({
   onSuccess,
   lead,
 }: AssignDialogProps) {
+  const me = useAuthStore((st) => st.user);
   const [users, setUsers] = useState<User[]>([]);
   const [selectedUserId, setSelectedUserId] = useState("");
   const [query, setQuery] = useState("");
@@ -51,18 +54,28 @@ export function AssignDialog({
       const { data } = await api.get("/users");
       const allUsers: User[] = data.data ?? [];
       setUsers(
-        allUsers.filter(
-          (u) =>
-            u.isActive &&
-            u.role === "SALES"
-        )
+        allUsers
+          .filter(
+            (u) =>
+              u.isActive &&
+              ASSIGNABLE_ROLES.includes(u.role) &&
+              // an MSP TL may take a lead themselves only if they created it
+              !(me?.role === "MSP_TL" && u.id === me.id && lead?.createdBy?.id !== me.id)
+          )
+          // Sales first, then MSP TLs; you at the top of your group
+          .sort(
+            (a, b) =>
+              (a.role === "SALES" ? 0 : 1) - (b.role === "SALES" ? 0 : 1) ||
+              (a.id === me?.id ? -1 : b.id === me?.id ? 1 : 0) ||
+              a.name.localeCompare(b.name)
+          )
       );
     } catch {
-      notify.error("Couldn't load Sales users", "Close the dialog and try again.");
+      notify.error("Couldn't load the team", "Close the dialog and try again.");
     } finally {
       setLoadingUsers(false);
     }
-  }, []);
+  }, [me?.id, me?.role, lead?.createdBy?.id]);
 
   useEffect(() => {
     if (open) {
@@ -81,8 +94,12 @@ export function AssignDialog({
       await api.patch(`/leads/${lead.id}/assign`, {
         assignedToId: selectedUserId,
       });
-      const assignee = users.find((u) => u.id === selectedUserId)?.name ?? "Sales";
-      notify.success(`Lead assigned to ${assignee}`, `${lead.companyName} — it's now in their To Call list`);
+      if (selectedUserId === me?.id) {
+        notify.success("Lead assigned to you", `${lead.companyName} — it's in Assigned Leads → To Call`);
+      } else {
+        const assignee = users.find((u) => u.id === selectedUserId)?.name ?? "Sales";
+        notify.success(`Lead assigned to ${assignee}`, `${lead.companyName} — it's now in their To Call list`);
+      }
       onSuccess();
       onClose();
     } catch (err: unknown) {
@@ -191,6 +208,7 @@ export function AssignDialog({
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-sm font-medium">
                           {u.name}
+                          {u.id === me?.id && <span className="ml-1.5 text-xs font-normal text-muted-foreground">(you)</span>}
                         </div>
                         <div className="truncate text-[11px] text-muted-foreground">
                           {formatRoleLabel(u.role)} · {u.email}

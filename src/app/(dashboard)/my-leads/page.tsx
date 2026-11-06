@@ -47,6 +47,11 @@ interface ActiveCall {
 export default function MyLeadsPage() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
+  // Sales only see their own leads anyway; an MSP TL sees every lead, so ask for theirs
+  const mine = useMemo(
+    () => (user?.role === "MSP_TL" ? { assignedToId: user.id } : ({} as Record<string, string>)),
+    [user?.role, user?.id]
+  );
 
   const [leads, setLeads] = useState<Lead[]>([]);
   const [total, setTotal] = useState(0);
@@ -77,6 +82,7 @@ export default function MyLeadsPage() {
     if (
       user &&
       user.role !== "SALES" &&
+      user.role !== "MSP_TL" &&
       user.role !== "ADMIN"
     ) {
       router.replace("/");
@@ -98,7 +104,7 @@ export default function MyLeadsPage() {
   const fetchLeads = useCallback(async (quiet?: boolean) => {
     try {
       if (quiet !== true) setLoading(true);
-      const params: Record<string, string | number> = { page, limit: pageSize, stage: tab };
+      const params: Record<string, string | number> = { page, limit: pageSize, stage: tab, ...mine };
       if (debouncedSearch) params.search = debouncedSearch;
 
       const { data } = await api.get("/leads", { params });
@@ -115,21 +121,21 @@ export default function MyLeadsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, pageSize, debouncedSearch, tab]);
+  }, [page, pageSize, debouncedSearch, tab, mine]);
 
   // Tab badges — just the totals
   const fetchCounts = useCallback(async () => {
     try {
       const [toCall, later] = await Promise.all(
         (["to_call", "call_later"] as const).map((stage) =>
-          api.get("/leads", { params: { stage, limit: 1 } })
+          api.get("/leads", { params: { stage, limit: 1, ...mine } })
         )
       );
       setCounts({ to_call: toCall.data.data?.total ?? 0, call_later: later.data.data?.total ?? 0 });
     } catch {
       // tab badges only — the list load above already reports failures
     }
-  }, []);
+  }, [mine]);
 
   useEffect(() => {
     fetchCounts();

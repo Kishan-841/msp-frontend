@@ -25,6 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import api from "@/lib/axios";
+import { useAuthStore } from "@/stores/auth-store";
 import { notify } from "@/lib/notify";
 import { formatDateTimeIN } from "@/lib/utils";
 import { useDiscardGuard } from "@/hooks/useDiscardGuard";
@@ -88,6 +89,7 @@ export function MeetingDialog({
     return () => clearTimeout(t);
   }, [leadQuery]);
 
+  const me = useAuthStore((st) => st.user);
   const fetchLeads = useCallback(
     async (q: string) => {
       try {
@@ -98,7 +100,15 @@ export function MeetingDialog({
           setLeads(one.data.data ? [one.data.data as Lead] : []);
           return;
         }
-        const { data } = await api.get("/leads", { params: { page: 1, limit: 20, search: q || undefined } });
+        const { data } = await api.get("/leads", {
+          params: {
+            page: 1,
+            limit: 20,
+            search: q || undefined,
+            // an MSP TL schedules meetings only on leads assigned to them
+            ...(me?.role === "MSP_TL" ? { assignedToId: me.id } : {}),
+          },
+        });
         // only leads already with Sales (ASSIGNED or later) can have a meeting
         const found: Lead[] = (data.data?.leads ?? []).filter(
           (l: Lead) => l.status !== "NEW" && l.status !== "CATEGORIZED" && !l.droppedAt
@@ -114,7 +124,7 @@ export function MeetingDialog({
         setLoadingLeads(false);
       }
     },
-    [preselectedLeadId]
+    [preselectedLeadId, me?.id, me?.role]
   );
 
   const selectedLeadRef = useRef(selectedLeadId);

@@ -17,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import api from "@/lib/axios";
 import { notify } from "@/lib/notify";
 import { apiErrorMessage } from "@/lib/utils";
+import { ASSIGNABLE_ROLES } from "@/lib/leadAccess";
 import type { User } from "@/types";
 
 /**
@@ -52,7 +53,7 @@ export function NewOrderDialog({
     (async () => {
       try {
         const { data } = await api.get("/users");
-        setSalesUsers(((data.data ?? []) as User[]).filter((u) => u.isActive && u.role === "SALES"));
+        setSalesUsers(((data.data ?? []) as User[]).filter((u) => u.isActive && ASSIGNABLE_ROLES.includes(u.role)));
       } catch {
         notify.warning("Couldn't load Sales users", "The order will stay with the current Sales person.");
       }

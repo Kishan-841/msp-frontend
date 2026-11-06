@@ -5,7 +5,7 @@ import type { UserRole } from "@/types";
 // Sections not listed are open to every signed-in user.
 export const PAGE_ROLES: Record<string, UserRole[]> = {
   "/leads": ["ADMIN", "MSP_TL", "SALES", "ACCOUNTS"], // Accounts: only via links to accepted deals
-  "/my-leads": ["ADMIN", "SALES"],
+  "/my-leads": ["ADMIN", "SALES", "MSP_TL"], // MSP TL: leads they took themselves
   "/meetings": ["ADMIN", "MSP_TL", "SALES"],
   "/quotes": ["ADMIN", "MSP_TL", "SALES", "ACCOUNTS"], // Accounts: read-only, via links from POs / invoices
   "/accounts": ["ADMIN", "ACCOUNTS", "MSP_TL"],

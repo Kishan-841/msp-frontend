@@ -39,6 +39,7 @@ import {
 } from "@/components/ui/dialog";
 import api from "@/lib/axios";
 import { notify } from "@/lib/notify";
+import { canWorkLead } from "@/lib/leadAccess";
 import { cn, formatDateIN, formatINR } from "@/lib/utils";
 import { canOpenPage } from "@/lib/pageAccess";
 import { useDataChanged } from "@/hooks/useDataChanged";
@@ -144,7 +145,7 @@ export default function QuoteDetailPage() {
   const canEdit = user?.role === "MSP_TL" || user?.role === "ADMIN";
   const canApprove = user?.role === "ADMIN";
   // Customer-facing steps (email, mark sent, customer accepted): the assigned Sales person or Admin
-  const canShare = user?.role === "ADMIN" || user?.role === "SALES";
+  const canShare = canWorkLead(user, quote?.lead?.assignedToId);
 
   const fetchQuote = useCallback(async () => {
     try {

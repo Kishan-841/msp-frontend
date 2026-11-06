@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/dialog";
 import api from "@/lib/axios";
 import { notify } from "@/lib/notify";
+import { canWorkLead } from "@/lib/leadAccess";
 import {
   formatINR,
   formatPaymentStatus,
@@ -67,9 +68,10 @@ export default function PurchaseOrderPage() {
   const isAdmin = role === "ADMIN";
   const canBuild = role === "MSP_TL" || isAdmin;
   const isAccounts = role === "ACCOUNTS" || isAdmin;
-  const canSend = role === "SALES" || isAdmin;
 
   const [po, setPo] = useState<PurchaseOrder | null>(null);
+  // sending to the vendor: Admin, or whoever the lead is assigned to (Sales or an MSP TL)
+  const canSend = canWorkLead(user, po?.lead?.assignedTo?.id);
   const [loading, setLoading] = useState(true);
   // "notfound" (deleted / not yours) vs "error" (network, server) — only the latter offers Retry
   const [loadError, setLoadError] = useState<"notfound" | "error" | null>(null);

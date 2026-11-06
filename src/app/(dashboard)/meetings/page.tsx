@@ -21,6 +21,7 @@ import api from "@/lib/axios";
 import { notify } from "@/lib/notify";
 import { useDataChanged } from "@/hooks/useDataChanged";
 import { useAuthStore } from "@/stores/auth-store";
+import { canWorkLead } from "@/lib/leadAccess";
 import { cn, formatDateTimeIN } from "@/lib/utils";
 import type { Lead, Meeting, MeetingListResponse } from "@/types";
 import { RequirementDialog } from "@/components/requirements/RequirementDialog";
@@ -65,7 +66,9 @@ export default function MeetingsPage() {
 
   // Meetings, MOM and final requirement are Sales work (Sales only sees their own leads here).
   // MSP TL can follow along read-only.
-  const canCreate = user?.role === "ADMIN" || user?.role === "SALES";
+  // Sales work: Sales, Admin, and MSP TLs on leads assigned to them (row actions check the lead)
+  const canCreate = user?.role === "ADMIN" || user?.role === "SALES" || user?.role === "MSP_TL";
+  const canWork = useCallback((assignedToId?: string | null) => canWorkLead(user, assignedToId), [user]);
 
   const updateUrlParams = useCallback(
     (params: Record<string, string>) => {
@@ -188,7 +191,7 @@ export default function MeetingsPage() {
         headClassName: "w-48 text-right",
         className: "text-right",
         cell: (l) =>
-          canCreate ? (
+          canWork(l.assignedTo?.id) ? (
           <Button
             size="sm"
             onClick={(e) => {
@@ -202,7 +205,7 @@ export default function MeetingsPage() {
           ) : null,
       },
     ],
-    [canCreate]
+    [canWork]
   );
 
   const columns: DataTableColumn<Meeting>[] = useMemo(
@@ -272,7 +275,7 @@ export default function MeetingsPage() {
         headClassName: "w-24 text-right",
         className: "text-right",
         cell: (m) => {
-          if (!canCreate) return <span className="text-xs text-muted-foreground">—</span>;
+          if (!canWork(m.lead?.assignedToId)) return <span className="text-xs text-muted-foreground">—</span>;
           if (!m.momContent) {
             return (
               <Button
@@ -318,7 +321,7 @@ export default function MeetingsPage() {
         },
       },
     ],
-    [canCreate]
+    [canWork]
   );
 
   const emptyMessageMap: Record<MeetingTab, string> = {

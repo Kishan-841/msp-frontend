@@ -41,6 +41,7 @@ import api from "@/lib/axios";
 import { notify } from "@/lib/notify";
 import { formatRoleLabel } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
+import { ASSIGNABLE_ROLES } from "@/lib/leadAccess";
 import type { Lead, LeadCategory, User } from "@/types";
 import { GST_STATE_OPTIONS, isValidGstin, stateName } from "@/lib/gst";
 import { SUBCATEGORIES } from "@/lib/categories";
@@ -232,11 +233,9 @@ export function LeadDialog({
         .then(({ data }) => {
           const all: User[] = data.data ?? [];
           setAssignees(
-            all.filter(
-              (u) =>
-                u.isActive &&
-                u.role === "SALES"
-            )
+            all
+              .filter((u) => u.isActive && ASSIGNABLE_ROLES.includes(u.role))
+              .sort((a, b) => (a.role === "SALES" ? 0 : 1) - (b.role === "SALES" ? 0 : 1) || a.name.localeCompare(b.name))
           );
         })
         .catch(() => setAssignees([]));
@@ -276,7 +275,10 @@ export function LeadDialog({
           await api.patch(`/leads/${newId}/assign`, {
             assignedToId: data.assignedToId,
           });
-          next = `Assigned to ${assignees.find((u) => u.id === data.assignedToId)?.name ?? "Sales"} — it's in their To Call list`;
+          next =
+            data.assignedToId === user?.id
+              ? "Assigned to you — it's in Assigned Leads → To Call"
+              : `Assigned to ${assignees.find((u) => u.id === data.assignedToId)?.name ?? "Sales"} — it's in their To Call list`;
         } else if (user?.role === "SALES") {
           next = "It's in your To Call list — MSP TL will add the category";
         } else if (created.data?.status === "CATEGORIZED") {
@@ -566,7 +568,7 @@ export function LeadDialog({
                   <div className="space-y-1.5">
                     {assignees.length === 0 ? (
                       <p className="text-xs text-muted-foreground">
-                        No active Sales users.
+                        No active Sales users or MSP TLs.
                       </p>
                     ) : (
                       <Select

@@ -16,6 +16,7 @@ import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { PillTabs, type PillTab } from "@/components/ui/tabs-pill";
 import api from "@/lib/axios";
 import { notify } from "@/lib/notify";
+import { canWorkLead } from "@/lib/leadAccess";
 import { formatDateIN, formatINR, formatPoStatusLabel, getPoStatusColor } from "@/lib/utils";
 import { useDataChanged } from "@/hooks/useDataChanged";
 import { useAuthStore } from "@/stores/auth-store";
@@ -266,7 +267,7 @@ export default function PurchaseOrdersPage() {
             );
           }
           const label =
-            p.status === "CONFIRMED" && (user?.role === "SALES" || user?.role === "ADMIN")
+            p.status === "CONFIRMED" && canWorkLead(user, p.lead?.assignedTo?.id)
               ? "Send to vendor"
               : (p.status === "DRAFT" || p.status === "REJECTED") && canCreate
                 ? "Finish & send"
@@ -279,7 +280,7 @@ export default function PurchaseOrdersPage() {
         },
       },
     ],
-    [canConfirm, canCreate, confirming, fetchPos, router, user?.role]
+    [canConfirm, canCreate, confirming, fetchPos, router, user]
   );
 
 

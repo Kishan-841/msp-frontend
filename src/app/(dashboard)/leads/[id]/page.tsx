@@ -31,6 +31,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import api from "@/lib/axios";
+import { canWorkLead } from "@/lib/leadAccess";
 import {
   formatStatusLabel,
   formatRoleLabel,
@@ -244,7 +245,7 @@ export default function LeadDetailPage() {
   }
 
   // Sales work on a lead: Admin or the Sales person it's assigned to (the API enforces the same)
-  const canSell = user?.role === "ADMIN" || (user?.role === "SALES" && lead.assignedTo?.id === user.id);
+  const canSell = canWorkLead(user, lead.assignedTo?.id);
   const canBookMeeting =
     canSell && !lead.droppedAt && ["ASSIGNED", "MEETING_SCHEDULED", "MEETING_DONE"].includes(lead.status);
 

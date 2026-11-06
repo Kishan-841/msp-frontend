@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/data-table";
 import api from "@/lib/axios";
 import { notify } from "@/lib/notify";
+import { canWorkLead } from "@/lib/leadAccess";
 import { formatDateIN, formatINR, getQuoteStatusColor, formatQuoteStatusLabel } from "@/lib/utils";
 import { useDataChanged } from "@/hooks/useDataChanged";
 import { useAuthStore } from "@/stores/auth-store";
@@ -73,8 +74,11 @@ export default function QuotesPage() {
 
   // MSP TL builds quotes, Admin approves them
   const canCreate = user?.role === "ADMIN" || user?.role === "MSP_TL";
-  // Customer-facing steps are Sales' (they only see quotes on their own leads)
-  const canSell = user?.role === "ADMIN" || user?.role === "SALES";
+  // Customer-facing steps: Admin, or whoever the quote's lead is assigned to (Sales or an MSP TL)
+  const canSell = useCallback(
+    (q: { lead?: { assignedToId?: string | null } | null }) => canWorkLead(user, q.lead?.assignedToId),
+    [user]
+  );
   const canApprove = user?.role === "ADMIN";
 
   // Quote requests are MSP TL's work: it's their default tab when something is waiting.
@@ -425,7 +429,7 @@ export default function QuotesPage() {
               </div>
             );
           }
-          if (q.status === "APPROVED" && canSell) {
+          if (q.status === "APPROVED" && canSell(q)) {
             return (
               <Button
                 variant="outline"
@@ -443,7 +447,7 @@ export default function QuotesPage() {
               </Button>
             );
           }
-          if (q.status === "SENT" && canSell) {
+          if (q.status === "SENT" && canSell(q)) {
             return (
               <Button
                 variant="outline"

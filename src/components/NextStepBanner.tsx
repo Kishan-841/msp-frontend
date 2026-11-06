@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowRight, ArrowUpRight, Hourglass, PartyPopper } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { LeadStatus, PurchaseOrderStatus, QuoteStatus, UserRole } from "@/types";
+import { canWorkLead } from "@/lib/leadAccess";
 
 export interface NextStep {
   /** who acts next, e.g. "Admin" */
@@ -70,8 +71,8 @@ interface Viewer {
 const isAdmin = (v: Viewer) => v.role === "ADMIN";
 const isTl = (v: Viewer) => v.role === "MSP_TL" || isAdmin(v);
 const isAccounts = (v: Viewer) => v.role === "ACCOUNTS" || isAdmin(v);
-const isAssignedSales = (v: Viewer, assignedToId?: string | null) =>
-  isAdmin(v) || (v.role === "SALES" && !!v.id && v.id === assignedToId);
+// the person the lead is assigned to (Sales, or an MSP TL who took it) — or Admin
+const isAssignedSales = (v: Viewer, assignedToId?: string | null) => canWorkLead(v, assignedToId);
 
 export function quoteNextStep(
   status: QuoteStatus,

@@ -108,7 +108,7 @@ export interface Meeting {
   momContent?: string;
   attachments: string[];
   conductedBy?: User;
-  lead?: { id: string; companyName: string; status?: LeadStatus; quoteRequestedAt?: string | null };
+  lead?: { id: string; companyName: string; status?: LeadStatus; quoteRequestedAt?: string | null; assignedToId?: string | null };
   createdAt: string;
   updatedAt: string;
 }
